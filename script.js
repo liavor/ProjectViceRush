@@ -14,7 +14,7 @@ const messageElement = document.getElementById("message");
 const scoreboard = document.getElementById("scoreboard");
 const playerHealthBar = document.getElementById("player-health");
 const startScreen = document.getElementById("start-screen");
-const startButton = document.getElementById("start-button"); // ID düzeltildi: "startButton" yerine "start-button" yapıldı
+const startButton = document.getElementById("start-button");
 const gameMusic = document.getElementById("gameMusic");
 const weaponIconElement = document.getElementById("weapon-icon");
 const ultimateVisualEffectElement = document.getElementById("ultimate-visual-effect");
@@ -65,15 +65,6 @@ const GRAVITY = 0.5; // Yerçekimi etkisi
 const DIAZ_TRIGGER_SCORE = 1000;
 const LANCE_TRIGGER_SCORE = 2500;
 const SONY_TRIGGER_SCORE = 4500;
-
-// Sabit Zaman Adımı (Fixed Timestep) değişkenleri
-let lastFrameTime = 0; // Son çizim karesinin zamanı
-const BASE_UPDATE_INTERVAL = 1000 / 60; // Temel oyun mantığı güncelleme aralığı (saniyede 60 güncelleme)
-let gameSpeedMultiplier = 1.0; // Oyun hızı çarpanı (1.0 = normal hız)
-const SPEED_ADJUSTMENT_STEP = 0.1; // Hız değişim adımı
-const MIN_GAME_SPEED_MULTIPLIER = 0.5; // Minimum hız çarpanı
-const MAX_GAME_SPEED_MULTIPLIER = 2.0; // Maksimum hız çarpanı
-let lag = 0; // Biriken zaman farkı
 
 // --- Yardımcı Fonksiyonlar ---
 
@@ -350,7 +341,7 @@ function updatePlayer() {
     // Zemine değme kontrolü
     if (playerY <= 0) {
         playerY = 0; playerVelY = 0; isJumping = false;
-        // Zıplamadan sonra yere düşünce idle/run durumına geç
+        // Zıplamadan sonra yere düşünce idle/run durumuna geç
         if (playerVelX === 0 && player.style.backgroundImage.indexOf('shoot') === -1) {
             player.style.backgroundImage = "url('player.png')";
         } else if (playerVelX !== 0) {
@@ -813,7 +804,7 @@ function activateUltimate() {
         setTimeout(() => currentBoss.element.classList.remove('hit'), 200);
         updateBossHealthBar();
         if (currentBoss.health <= 0) {
-            handleBossHitByPlayerBullet(null); // Bomba ile öldüğü için mermi göndermiyoruz
+            handleBossHitByPlayerBullet(null); // Ulti ile öldüğü için mermi göndermiyoruz
         }
     }
 }
@@ -999,15 +990,6 @@ document.addEventListener("keydown", (e) => {
     if (e.key.toLowerCase() === "l") { // 'l' tuşu ultimate için
         activateUltimate();
     }
-    // Yeni hız kontrol tuşları
-    if (e.key.toLowerCase() === "c") { // 'C' tuşu hızı artırır
-        gameSpeedMultiplier = Math.min(MAX_GAME_SPEED_MULTIPLIER, gameSpeedMultiplier + SPEED_ADJUSTMENT_STEP);
-        console.log("Oyun Hızı: x" + gameSpeedMultiplier.toFixed(1));
-    }
-    if (e.key.toLowerCase() === "v") { // 'V' tuşu hızı azaltır
-        gameSpeedMultiplier = Math.max(MIN_GAME_SPEED_MULTIPLIER, gameSpeedMultiplier - SPEED_ADJUSTMENT_STEP);
-        console.log("Oyun Hızı: x" + gameSpeedMultiplier.toFixed(1));
-    }
 });
 
 // Klavye tuş bırakmalarını dinle
@@ -1030,92 +1012,74 @@ startButton.addEventListener('click', () => {
 
 /**
  * Oyunun ana döngüsü. Her karede oyun durumunu günceller ve çizimleri yapar.
- * Bu döngü, tarayıcının ekran yenileme hızıyla senkronize çalışır (requestAnimationFrame).
- * Oyun mantığı, sabit zaman adımı (FIXED_UPDATE_RATE) kullanılarak tarayıcı performansından bağımsız hale getirilmiştir.
- * @param {DOMHighResTimeStamp} currentTime - requestAnimationFrame tarafından sağlanan mevcut zaman.
  */
-function gameLoop(currentTime) {
+function gameLoop() {
     if (isGameOver) return; // Oyun bittiyse döngüyü durdur
 
-    // lastFrameTime'ı ilk çağrıda başlat
-    if (lastFrameTime === 0) {
-        lastFrameTime = currentTime;
-    }
+    // Tüm oyun öğelerini güncelle
+    updatePlayer();
+    updateBullets();
+    updateEnemies();
+    updatePizzas();
+    updatePowerUps();
+    updatePlayerBombs(); // Oyuncu bombalarını güncelle
 
-    const elapsed = currentTime - lastFrameTime; // Geçen süreyi hesapla
-    lastFrameTime = currentTime; // Son kare zamanını güncelle
-    lag += elapsed; // Birikmiş lag'ı artır
+    // Arka planı kaydır
+    scrollBackground();
 
-    // Oyun mantığını sabit zaman adımlarıyla güncelle
-    // Bu döngü, lag FIXED_UPDATE_RATE'ten büyük olduğu sürece çalışır,
-    // böylece oyun mantığı FPS'ten bağımsız olarak tutarlı hızda ilerler.
-    const currentFixedUpdateRate = BASE_UPDATE_INTERVAL / gameSpeedMultiplier; // Hıza göre dinamik güncelleme oranı
-    while (lag >= currentFixedUpdateRate) {
-        // Tüm oyun öğelerini güncelle
-        updatePlayer();
-        updateBullets();
-        updateEnemies();
-        updatePizzas();
-        updatePowerUps();
-        updatePlayerBombs();
-        scrollBackground();
-
-        // Boss tetikleme ve güncelleme mantığı da sabit zaman adımına taşındı
-        if (!isBossActive) { // Boss aktif değilse yeni boss'u tetikleme kontrolü yap
-            if (score >= SONY_TRIGGER_SCORE && gameStage === 3) {
-                createBoss('Sony');
-                changeBackground('background_sony.png'); // Sony boss için özel arka plan
-            } else if (score >= LANCE_TRIGGER_SCORE && gameStage === 2) {
-                createBoss('Lance');
-                changeBackground('background_lance.png'); // Lance boss için özel arka plan
-            } else if (score >= DIAZ_TRIGGER_SCORE && gameStage === 1) {
-                createBoss('Diaz');
-                changeBackground('background_diaz.png'); // Diaz boss için özel arka plan
-            }
-        } else { // Boss aktifse davranışını güncelle
-            if (currentBoss && currentBoss.element) {
-                const bossRect = getRect(currentBoss.element);
-                let bossX = bossRect.leftVal;
-                // Boss ekrana girmeden önce hareket etsin (ekranın sağ kenarına 100px kala dur)
-                if (bossX > game.clientWidth - currentBoss.element.clientWidth - 100) {
-                    bossX -= 2; // Boss giriş hızı
-                    currentBoss.element.style.left = bossX + "px";
-                } else {
-                    // Boss durduktan sonra saldırı yapsın
-                    // Boss saldırı cooldown'ı için currentTime kullanılır, böylece oyun mantığı hızıyla senkronize olur.
-                    if (currentTime - currentBoss.lastAttackTime > currentBoss.attackCooldown) {
-                        if (currentBoss.name === 'Diaz') {
-                            shootBossBullet(currentBoss);
-                            currentBoss.attackCooldown = 800 + Math.random() * 500; // Rastgele bekleme
-                        } else if (currentBoss.name === 'Lance') {
-                            throwBossBomb(currentBoss);
-                            shootBossBullet(currentBoss); // Aynı anda mermi de atabilir
-                            currentBoss.attackCooldown = 1200 + Math.random() * 800;
-                        } else if (currentBoss.name === 'Sony') {
-                            // Sony'nin özel saldırı paterni (daha sık mermi, bazen bomba)
-                            if (Math.random() < 0.7) shootBossBullet(currentBoss);
-                            else throwBossBomb(currentBoss);
-                            currentBoss.attackCooldown = 600 + Math.random() * 400;
-                            // Sony boss aktifken normal düşmanları da yaratmaya devam edebilir
-                            if (enemies.length < enemyMaxCount && Math.random() < 0.015) {
-                                createEnemy();
-                            }
-                        }
-                        currentBoss.lastAttackTime = currentTime; // Son saldırı zamanını güncelle
-                    }
-                }
-            }
-        }
-
-        lag -= currentFixedUpdateRate; // İşlenen her sabit adım için lag'ı azalt
-    }
-
-    // Yağmur efekti gibi çizim güncellemeleri, sabit zaman adımından bağımsız olarak her karede çizilir
+    // Yağmur efektini çiz (eğer canvas varsa)
     if (gameCanvas) {
         drawRain();
     }
 
-    animationFrameId = requestAnimationFrame(gameLoop); // Bir sonraki kare için döngüyü tekrarla
+    // Boss tetikleme ve güncelleme
+    if (!isBossActive) { // Boss aktif değilse yeni boss'u tetikleme kontrolü yap
+        if (score >= SONY_TRIGGER_SCORE && gameStage === 3) {
+            createBoss('Sony');
+            changeBackground('background_sony.png'); // Sony boss için özel arka plan
+        } else if (score >= LANCE_TRIGGER_SCORE && gameStage === 2) {
+            createBoss('Lance');
+            changeBackground('background_lance.png'); // Lance boss için özel arka plan
+        } else if (score >= DIAZ_TRIGGER_SCORE && gameStage === 1) {
+            createBoss('Diaz');
+            changeBackground('background_diaz.png'); // Diaz boss için özel arka plan
+        }
+    } else { // Boss aktifse davranışını güncelle
+        if (currentBoss && currentBoss.element) {
+            const bossRect = getRect(currentBoss.element);
+            let bossX = bossRect.leftVal;
+            // Boss ekrana girmeden önce hareket etsin (ekranın sağ kenarına 100px kala dur)
+            if (bossX > game.clientWidth - currentBoss.element.clientWidth - 100) {
+                bossX -= 2; // Boss giriş hızı
+                currentBoss.element.style.left = bossX + "px";
+            } else {
+                // Boss durduktan sonra saldırı yapsın
+                const now = Date.now();
+                if (now - currentBoss.lastAttackTime > currentBoss.attackCooldown) {
+                    if (currentBoss.name === 'Diaz') {
+                        shootBossBullet(currentBoss);
+                        currentBoss.attackCooldown = 800 + Math.random() * 500; // Rastgele bekleme
+                    } else if (currentBoss.name === 'Lance') {
+                        throwBossBomb(currentBoss);
+                        shootBossBullet(currentBoss); // Aynı anda mermi de atabilir
+                        currentBoss.attackCooldown = 1200 + Math.random() * 800;
+                    } else if (currentBoss.name === 'Sony') {
+                        // Sony'nin özel saldırı paterni (daha sık mermi, bazen bomba)
+                        if (Math.random() < 0.7) shootBossBullet(currentBoss);
+                        else throwBossBomb(currentBoss);
+                        currentBoss.attackCooldown = 600 + Math.random() * 400;
+                        // Sony boss aktifken normal düşmanları da yaratmaya devam edebilir
+                        if (enemies.length < enemyMaxCount && Math.random() < 0.015) {
+                            createEnemy();
+                        }
+                    }
+                    currentBoss.lastAttackTime = now;
+                }
+            }
+        }
+    }
+
+    animationFrameId = requestAnimationFrame(gameLoop); // Döngüyü tekrarla
 }
 
 /**
@@ -1130,10 +1094,10 @@ function initRainCanvas() {
     ctx = gameCanvas.getContext('2d'); // 2D çizim bağlamı
     raindrops = [];
     maxRaindrops = 100; // Ekrandaki maksimum yağmur damlası sayısı
-    // Başlangıçta tüm damlaları oluşturarak yağmurun anında dolu görünmesini sağla
-    for (let i = 0; i < maxRaindrops; i++) {
-        createRaindrop();
-    }
+    // Başlangıçta tüm damlaları oluşturmayı kaldırdık, artık drawRain() fonksiyonu zamanla dolduracak.
+    // for (let i = 0; i < maxRaindrops; i++) {
+    //     createRaindrop();
+    // }
 }
 
 // --- Oyun Başlangıç ve Yeniden Başlatma Fonksiyonları ---
@@ -1212,14 +1176,15 @@ function initGame() {
     // Yağmur kanvasını başlat (eğer henüz yoksa)
     if (!gameCanvas) {
         initRainCanvas();
-    } else { // Zaten varsa, yağmur damlalarını sıfırla ve yeniden oluştur
-        raindrops = [];
-        for (let i = 0; i < maxRaindrops; i++) {
-            createRaindrop();
-        }
     }
-    
-    // Oyunun ilk düşmanlarını ve pizzasını yarat
+    // Yağmur damlalarını sıfırla ve yeniden oluştur (artık initRainCanvas'ta tamamen oluşturulmuyor)
+    raindrops = [];
+    // Bu kısım boş bırakıldı, drawRain() zamanla damlaları yaratacak.
+    // for (let i = 0; i < maxRaindrops; i++) {
+    //     createRaindrop();
+    // }
+
+    // İlk düşmanları ve pizzaları yarat
     for(let i = 0; i < enemyMaxCount; i++) {
         createEnemy();
     }
@@ -1232,8 +1197,6 @@ function initGame() {
     if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
     }
-    lastFrameTime = 0; // Sabit zaman adımı için başlangıç zamanını sıfırla
-    lag = 0; // Lag değerini sıfırla
     animationFrameId = requestAnimationFrame(gameLoop);
 }
 
