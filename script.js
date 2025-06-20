@@ -41,7 +41,7 @@ const DOUBLE_SHOT_DURATION = 10000; // Çift atış gücünün süresi (10 saniy
 
 let playerBombCount; // Oyuncunun sahip olduğu bomba sayısı
 const MAX_BOMBS = 10; // Maksimum bomba sayısı
-let playerBombCooldown = 5000; // Bomba bekleme süresi (10 saniye)
+let playerBombCooldown = 5000; // Bomba bekleme süresi (5 saniye)
 let lastPlayerBombTime; // Son bomba atıldığı veya kazanıldığı zaman
 
 let ultimateCharge, ultimateChargeMax, isUltimateReady; // Ulti yeteneği değişkenleri
