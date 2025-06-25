@@ -41,7 +41,7 @@ const DOUBLE_SHOT_DURATION = 10000; // Çift atış gücünün süresi (10 saniy
 
 let playerBombCount; // Oyuncunun sahip olduğu bomba sayısı
 const MAX_BOMBS = 10; // Maksimum bomba sayısı
-let playerBombCooldown = 5000; // Bomba bekleme süresi (5 saniye)
+let playerBombCooldown = 3000; // Bomba bekleme süresi (3 saniye)
 let lastPlayerBombTime; // Son bomba atıldığı veya kazanıldığı zaman
 
 let ultimateCharge, ultimateChargeMax, isUltimateReady; // Ulti yeteneği değişkenleri
@@ -226,6 +226,7 @@ function createBoss(bossName) {
     isBossActive = true;
     isBossDefeated = false; // Yeni boss başladığında sıfırla
     currentBoss = { name: bossName, element: bossElement, health: maxHP, maxHealth: maxHP, damageMultiplier: dmgMultiplier, lastAttackTime: 0, attackCooldown: 1000 };
+    startBombRainForBoss(bossName);
     updateBossHealthBar(); // Boss can barını güncelle
 }
 
@@ -930,6 +931,9 @@ function handleBossHitByPlayerBullet(bulletElement) {
     if (bulletElement && bulletElement.parentNode) {
         bulletElement.remove();
     }
+    if (currentBoss.bombRainInterval) {
+        clearInterval(currentBoss.bombRainInterval);
+    }
 
     currentBoss.health -= 20; // Normal mermi hasarı (ulti veya bomba vurursa bu kısım null gelir, hasar ayrı işlenir)
     currentBoss.element.classList.add('hit'); // Vurulma efekti
@@ -1023,6 +1027,7 @@ function gameLoop() {
     updatePizzas();
     updatePowerUps();
     updatePlayerBombs(); // Oyuncu bombalarını güncelle
+    updateBossRainBombs(); // Boss yağmur bombalarını güncelle
 
     // Arka planı kaydır
     scrollBackground();
@@ -1223,3 +1228,71 @@ document.addEventListener('DOMContentLoaded', () => {
     if (startScreen) startScreen.style.display = 'flex';
     console.log("DOM içeriği yüklendi.");
 });
+
+
+
+function startBombRainForBoss(bossName) {
+    const intervalMap = {
+        'Diaz': 800,
+        'Lance': 600,
+        'Sony': 400
+    };
+
+    const interval = intervalMap[bossName];
+    if (!interval) return;
+
+    currentBoss.bombRainInterval = setInterval(() => {
+        if (!isBossActive || !currentBoss || currentBoss.name !== bossName) {
+            clearInterval(currentBoss.bombRainInterval);
+            return;
+        }
+
+        const bomb = document.createElement("div");
+        bomb.className = "bomb";
+        bomb.style.left = Math.random() * game.clientWidth + "px";
+        bomb.style.top = "-30px"; // yukarıdan başlasın
+        bomb.style.position = "absolute";
+
+        const bombData = {
+            element: bomb,
+            posY: -30,
+            velY: 0,
+            isExploding: false,
+            damageRadius: 40,
+            damageAmount: 15
+        };
+
+        bombs.push(bombData);
+        game.appendChild(bomb); // bombayı doğrudan #game'e ekle
+    }, interval);
+}
+
+function updateBossRainBombs() {
+    for (let i = bombs.length - 1; i >= 0; i--) {
+        const bomb = bombs[i];
+        if (!bomb || !bomb.element) {
+            bombs.splice(i, 1);
+            continue;
+        }
+
+        bomb.velY += GRAVITY * 0.6;
+        bomb.posY += bomb.velY;
+        bomb.element.style.top = bomb.posY + "px";
+
+        if (player && checkCollision(getRect(bomb.element), getRect(player))) {
+            playerHealth -= bomb.damageAmount;
+            player.classList.add('hit');
+            setTimeout(() => player.classList.remove('hit'), 200);
+            if (playerHealthBar) playerHealthBar.style.width = Math.max(0, (playerHealth / 100) * 64) + "px";
+            bomb.element.remove();
+            bombs.splice(i, 1);
+            if (playerHealth <= 0) gameOver("Tommy bomba yağmuruna yakalandı!");
+            continue;
+        }
+
+        if (bomb.posY > game.clientHeight) {
+            bomb.element.remove();
+            bombs.splice(i, 1);
+        }
+    }
+}
